@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <title>Geo Events</title>
+    <style>
+      /* Always set the map height explicitly to define the size of the div
+       * element that contains the map. */
+      #map {
+        height: 100%;
+      }
+      /* Optional: Makes the sample page fill the window. */
+      html, body {
+        height: 100%;
+        margin: 0;
+      }
+      .geoData{
+        position: absolute;
+        right: 15px;
+        top: 15px;
+        z-index: 99;
+      }
+      #btn {
+        border:0px;
+        background-color: darkgreen;
+        color: green;
+      }
+    </style>
+    <script type="text/javascript" src="jquery.min.js"></script>
+    <script type="text/javascript" src="underscore-min.js"></script>
+    <script type="text/javascript" src="backbone-min.js"></script>
+    <!--<script type="text/javascript" src="geoEvent.js"></script>-->
+    <link href="bootstrap.min.css" rel="stylesheet">
+    <link href="font-awesome/css/font-awesome.css" rel="stylesheet">
+  </head>
+  <body>
+    <div class="geoData">
+      <input type="button" value="On|Off" id="btn" onclick="switchListiningOnOff()"/>
+      <div id="getData">
+      </div>
+    </div>
+    <div id="map"></div>
+    <script>
+
+      // This example creates an interactive map which constructs a polyline based on
+      // user clicks. Note that the polyline only appears once its path property
+      // contains two LatLng coordinates.
+      _.templateSettings = {
+            evaluate : /\{\[([\s\S]+?)\]\}/g,
+            interpolate : /\{\{([\s\S]+?)\}\}/g
+      };
+
+
+      var poly;
+      var map;
+      var mapListener = null;
+      var reAddListenFunction = null;
+      var markers = [];
+      var newPoly = null;
+      var template = null;
+      $.get("template.html",function(data){
+        template = _.template(data);
+      });
+
+      var rowHtml = [];
+      
+
+      function initMap() {
+        map = new google.maps.Map(document.getElementById('map'), {
+          zoom: 5,
+          center: {lat: 30, lng: -95},  
+          styles: [
+                    {
+                        "stylers": [
+                            {
+                                "hue": "#ff1a00"
+                            },
+                            {
+                                "invert_lightness": true
+                            },
+                            {
+                                "saturation": -100
+                            },
+                            {
+                                "lightness": 33
+                            },
+                            {
+                                "gamma": 0.5
+                            }
+                        ]
+                    },
+                    {
+                        "featureType": "water",
+                        "elementType": "geometry",
+                        "stylers": [
+                            {
+                                "color": "#2D333C"
+                            }
+                        ]
+                    }
+                ]
+        });
+        function createNewPoly(){
+              poly = new google.maps.Polyline({
+                          strokeColor: '#3ace2d',
+                          strokeOpacity: 1.0,
+                          strokeWeight: 3.5
+                        });
+                        poly.setMap(map);
+        }
+        
+        newPoly = createNewPoly;
+        // Add a listener for the click event
+        if(mapListener==null) {
+          createNewPoly();
+          mapListener = map.addListener('click', addLatLng);
+        }
+      }
+      
+
+      // Handles click events on a map, and adds a new point to the Polyline.
+      function addLatLng(event) {
+        var path = poly.getPath();
+
+        // Because path is an MVCArray, we can simply append a new coordinate
+        // and it will automatically appear.
+        path.push(event.latLng);
+        $params = {"lat":event.latLng.lat(),"lng":event.latLng.lng()};
+        console.log($params);
+        $.get( "getData.php", {"action": "fetch","params": $params} )
+          .done(function( data ) {
+            if (!data.error) {
+              var array = data.data;
+              $("#getData").html("");
+              rowHtml = [];
+              for(var i=0;i<array.length;i++){
+                var row = array[i];
+                rowHtml[i] = template(row);
+                //console.log(rowHtml[rowHtml.length-1]);
+                //$("#getData").append(rowHtml[i]);
+                function callbackTimer(x){
+                  var index = parseInt(x);
+                    console.log("i is:"+index);
+                    $("#getData").append(rowHtml[index]);
+                }
+                setTimeout(callbackTimer,1000*i,i);
+              }
+            } else {
+              console.log("error loading data..");
+              console.log(JSON.stringify(data));
+            }
+          })
+          .fail(function(error){
+            if(error.responseText){
+              console.log(error.responseText);
+            } else {
+              console.log(error);
+            }
+          });
+        // Add a new marker at the new plotted point on the polyline.
+        var marker = new google.maps.Marker({
+          position: event.latLng,
+          title: '#' + path.getLength(),
+          map: map
+        });
+        markers.push(marker);
+      }
+
+
+      function switchListiningOnOff(){
+        if(mapListener==null){
+          console.log('trying to add a listener');
+          newPoly();
+          mapListener = map.addListener('click', addLatLng);
+        } else {
+          google.maps.event.clearListeners(map, 'click');
+          mapListener = null;
+          poly.setMap(null);
+          for (var i = 0; i < markers.length; i++) {
+            markers[i].setMap(null);
+          }
+          $("#getData").html("");
+          console.log('listeners cleared');
+        }
+      }
+
+    </script>
+    <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBGSu_x-fjXd0mSsZoDc7azmRbBuyYRYps&callback=initMap">
+    </script>
+  </body>
+</html>
