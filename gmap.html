@@ -59,12 +59,15 @@
       var markers = [];
       var newPoly = null;
       var template = null;
+      var polilineCount = 0;
       $.get("template.html",function(data){
         template = _.template(data);
       });
 
-      var rowHtml = [];
+      var geoInfo = [];
       
+      var rowHtml = [];
+      var geoMarkers = [];
 
       function initMap() {
         map = new google.maps.Map(document.getElementById('map'), {
@@ -122,20 +125,23 @@
       // Handles click events on a map, and adds a new point to the Polyline.
       function addLatLng(event) {
         var path = poly.getPath();
-
+        polilineCount = polilineCount+1;
         // Because path is an MVCArray, we can simply append a new coordinate
         // and it will automatically appear.
         path.push(event.latLng);
         $params = {"lat":event.latLng.lat(),"lng":event.latLng.lng()};
         console.log($params);
+        if(polilineCount>1) {
         $.get( "getData.php", {"action": "fetch","params": $params} )
           .done(function( data ) {
             if (!data.error) {
               var array = data.data;
               $("#getData").html("");
               rowHtml = [];
+              geoInfo = [];
               for(var i=0;i<array.length;i++){
                 var row = array[i];
+                geoInfo.push(row);
                 rowHtml[i] = template(row);
                 //console.log(rowHtml[rowHtml.length-1]);
                 //$("#getData").append(rowHtml[i]);
@@ -143,6 +149,14 @@
                   var index = parseInt(x);
                     console.log("i is:"+index);
                     $("#getData").append(rowHtml[index]);
+                    var coordinate = {lat: geoInfo[index].LATITUDE, lng: geoInfo[index].LONGITUDE};
+                    console.log(coordinate);
+                    var geoMarker = new google.maps.Marker({
+                      position: coordinate,
+                      title: '#' + geoInfo[index].TITLE,
+                      map: map
+                    });
+                    markers.push(geoMarker);
                 }
                 setTimeout(callbackTimer,1000*i,i);
               }
@@ -158,6 +172,7 @@
               console.log(error);
             }
           });
+        }
         // Add a new marker at the new plotted point on the polyline.
         var marker = new google.maps.Marker({
           position: event.latLng,
@@ -177,6 +192,7 @@
           google.maps.event.clearListeners(map, 'click');
           mapListener = null;
           poly.setMap(null);
+          polilineCount = 0;
           for (var i = 0; i < markers.length; i++) {
             markers[i].setMap(null);
           }
